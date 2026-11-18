@@ -23,6 +23,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      {process.env.NEXT_PUBLIC_COI_SERVICE_WORKER === "1" && (
+        <head>
+          {/* Hosts without COOP/COEP headers (GitHub Pages): a service worker adds them so
+              multi-threaded WASM works. It reloads the page once on first visit. */}
+          {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+          <script src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/coi-serviceworker.min.js`} />
+        </head>
+      )}
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

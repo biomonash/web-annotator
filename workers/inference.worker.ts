@@ -10,7 +10,10 @@ import type { BackendPreference, FromWorker, ModelBackend, ToWorker } from "./pr
 
 declare const self: DedicatedWorkerGlobalScope;
 
-const ORT_URL = "/ort/ort.webgpu.min.mjs";
+// The app may be served under a base path (e.g. /web-annotator on GitHub Pages); worker chunks live in <base>/_next/.
+const BASE_PATH = self.location.pathname.split("/_next/")[0];
+const ORT_DIR = `${BASE_PATH}/ort/`;
+const ORT_URL = `${ORT_DIR}ort.webgpu.min.mjs`;
 
 let model: ScoreModel | null = null;
 let modelLoading: Promise<void> | null = null;
@@ -30,9 +33,9 @@ function post(msg: FromWorker, transfer: Transferable[] = []) {
 }
 
 async function loadOrt(): Promise<typeof Ort> {
-  // Loaded at runtime from /ort (copied by scripts/copy-ort.mjs) so the bundler leaves ORT's wasm loading alone.
+  // Loaded at runtime from <base>/ort (copied by scripts/copy-ort.mjs) so the bundler leaves ORT's wasm loading alone.
   const ort: typeof Ort = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ ORT_URL);
-  ort.env.wasm.wasmPaths = "/ort/";
+  ort.env.wasm.wasmPaths = ORT_DIR;
   ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
   return ort;
 }

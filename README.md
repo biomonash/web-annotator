@@ -43,6 +43,18 @@ Cross-Origin-Embedder-Policy: require-corp
 `public/_headers` handles this on Netlify and Cloudflare Pages. Without these headers the app still works, but it is
 single-threaded and slower. Some hosts limit file size: `public/ort/*.wasm` is about 29 MB.
 
+#### GitHub Pages
+
+`.github/workflows/deploy-pages.yml` runs the tests, then builds and deploys on every push to `main`. It can also be
+started manually. One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+The workflow sets two build variables:
+
+- `NEXT_PUBLIC_BASE_PATH`: the repository's Pages path (e.g. `/web-annotator`), taken from `actions/configure-pages`.
+- `NEXT_PUBLIC_COI_SERVICE_WORKER=1`: GitHub Pages can't send COOP/COEP headers, so
+  [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) adds them. The page reloads once on the first
+  visit.
+
 ## Layout
 
 | Path | Purpose |

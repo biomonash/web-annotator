@@ -10,7 +10,11 @@ const isolationHeaders = [
 // so production hosts read them from `public/_headers` instead; `next dev` sets them here.
 const isBuild = process.env.NODE_ENV === "production";
 
+// Set by the GitHub Pages workflow (e.g. "/web-annotator"); empty for local dev and root deployments.
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
+  basePath,
   ...(isBuild
     ? { output: "export" }
     : { headers: async () => [{ source: "/:path*", headers: isolationHeaders }] }),
