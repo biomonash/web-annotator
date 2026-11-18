@@ -10,6 +10,9 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  // Only used in the results table, which appears after a file is processed. Preloading it makes
+  // browsers warn that the preloaded font was not used.
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -28,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {/* Hosts without COOP/COEP headers (GitHub Pages): a service worker adds them so
               multi-threaded WASM works. It reloads the page once on first visit. */}
           {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-          <script src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/coi-serviceworker.min.js`} />
+          <script src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/coi-register.js`} />
         </head>
       )}
       <body className="min-h-full flex flex-col">{children}</body>

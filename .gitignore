@@ -46,4 +46,3 @@ next-env.d.ts
 /public/models
 /test-results
 /playwright-report
-/public/coi-serviceworker.min.js

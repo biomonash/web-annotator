@@ -51,9 +51,10 @@ started manually. One-time setup: **Settings → Pages → Build and deployment 
 The workflow sets two build variables:
 
 - `NEXT_PUBLIC_BASE_PATH`: the repository's Pages path (e.g. `/web-annotator`), taken from `actions/configure-pages`.
-- `NEXT_PUBLIC_COI_SERVICE_WORKER=1`: GitHub Pages can't send COOP/COEP headers, so
-  [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) adds them. The page reloads once on the first
-  visit.
+- `NEXT_PUBLIC_COI_SERVICE_WORKER=1`: GitHub Pages can't send COOP/COEP headers, so a small service worker
+  (`public/coi-sw.js`, registered by `public/coi-register.js`) adds them to same-origin responses. The page reloads once
+  on the first visit. Cross-origin requests such as the model download are left alone: their CORS headers already
+  satisfy COEP, and Firefox fails when a service worker relays very large cross-origin downloads.
 
 ## Layout
 

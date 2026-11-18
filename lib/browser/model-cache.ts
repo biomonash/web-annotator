@@ -31,7 +31,13 @@ export async function fetchModel(
   let loaded = 0;
   let lastReport = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (e) {
+      throw new Error(`Model download interrupted after ${Math.round(loaded / 2 ** 20)} MB: ${(e as Error)?.message ?? e}`);
+    }
+    const { done, value } = chunk;
     if (done) break;
     parts.push(value);
     loaded += value.byteLength;
