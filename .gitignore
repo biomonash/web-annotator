@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# large / generated assets
+/models
+/public/ort
+/public/models
+/test-results
+/playwright-report

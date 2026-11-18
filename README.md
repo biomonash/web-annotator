@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Little Penguin call detector (web)
 
-## Getting Started
+Detects Little Penguin calls in long WAV/FLAC recordings **entirely in the browser**. It runs the Perch v2 model with
+onnxruntime-web, so nothing is uploaded. It streams audio from disk window by window, so detections appear (and can be
+played) while the rest of the file is still processing. Results export as Raven selection tables (TSV) or CSV.
 
-First, run the development server:
+The original Python proof of concept is `annotation_tool.py`.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install            # also copies the onnxruntime-web runtime into public/ort (postinstall)
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The model (`perch_v2_no_dft.onnx`, about 400 MB) is downloaded on first use and kept in the browser's Cache Storage.
+By default it is fetched from Hugging Face. To serve a local copy during development:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+mkdir -p models   # put perch_v2_no_dft.onnx here (git-ignored)
+ln -s ../models public/models
+echo 'NEXT_PUBLIC_MODEL_URL=/models/perch_v2_no_dft.onnx' > .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Command         | What it does                                                                     |
+| --------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`   | Dev server (sets the COOP/COEP headers needed for multi-threaded WASM)           |
+| `npm run build` | Static export to `out/`; deploy anywhere that serves static files                |
+| `npm test`      | Vitest unit tests; also runs the real model through onnxruntime-node if `models/` has it |
+| `npm run e2e`   | Playwright end-to-end tests in Chrome (needs `sox` and `flac`, plus the local model setup above) |
 
-To learn more about Next.js, take a look at the following resources:
+### Deploying
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`npm run build` produces a static site. For multi-threaded inference the host must send:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
 
-## Deploy on Vercel
+`public/_headers` handles this on Netlify and Cloudflare Pages. Without these headers the app still works, but it is
+single-threaded and slower. Some hosts limit file size: `public/ort/*.wasm` is about 29 MB.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Path | Purpose |
+| --- | --- |
+| `lib/audio/` | Streaming WAV/FLAC decoding to int16, clipping (wrap-around) fix, mono mixdown, resampling. No DOM dependency. |
+| `lib/pipeline/` | Model constants, windowed analysis loop, detection runs, Raven selection table writer/checker. No DOM dependency, so it also runs under Node (see `tests/model.test.ts`). |
+| `lib/browser/` | Browser-only helpers: model download and cache, OPFS clip storage, audio playback. |
+| `workers/` | Inference Web Worker and its message protocol. |
+| `components/` | React UI. |
+
+## How detection works
+
+1. The audio is decoded in chunks. Each channel gets the PoC's overflow fix, then channels are averaged to mono.
+2. Every 5 s window is resampled to 32 kHz and scored by Perch v2. The last partial window is zero-padded.
+3. Score = `sigmoid(logit)` for class 4878 (Little Penguin). This is a detector score, not a calibrated probability.
+4. Consecutive windows with score ≥ threshold become one detection. Changing the threshold regroups the windows
+   instantly, without re-running the model.
+
+To play clips: WAV files are read directly from disk. FLAC can't be seeked reliably, so the worker writes decoded mono
+audio to the Origin Private File System as it processes, and clips are read back from there.
