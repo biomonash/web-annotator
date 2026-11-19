@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -40,7 +40,14 @@ for (const [label, file] of [
 
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download TSV (Raven)" }).click();
-    expect((await download).suggestedFilename()).toBe("noise.Table.1.selections.tsv");
+    const tsvDownload = await download;
+    expect(tsvDownload.suggestedFilename()).toBe("noise.Table.1.selections.tsv");
+    const [header, firstRow] = readFileSync(await tsvDownload.path(), "utf8").split("\n");
+    const cols = header.split("\t");
+    const row = Object.fromEntries(firstRow.split("\t").map((v, i) => [cols[i], v]));
+    expect(cols.slice(5, 7)).toEqual(["Low Freq (Hz)", "High Freq (Hz)"]);
+    expect(row["Low Freq (Hz)"]).toBe("0");
+    expect(row["High Freq (Hz)"]).toBe("24000"); // half of the 48 kHz test recording
 
     expect(errors).toEqual([]);
   });

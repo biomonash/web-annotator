@@ -8,6 +8,8 @@ export const SELECTION_COLUMNS = [
   "Channel",
   "Begin Time (s)",
   "End Time (s)",
+  "Low Freq (Hz)",
+  "High Freq (Hz)",
   "Annotation",
   "call_type",
   "condition",
@@ -22,21 +24,28 @@ export type SelectionRow = Record<string, string>;
 export interface SelectionInput {
   begin: number;
   end: number;
+  /** Defaults to 0 Hz. */
+  lowFreq?: number;
+  /** Defaults to the Nyquist frequency (half the recording's sample rate). */
+  highFreq?: number;
   score?: number;
   annotation?: string;
 }
 
 export interface TableOptions {
+  /** Sample rate of the analysed recording; the default High Freq is half of it. */
+  sampleRate: number;
   includeScore?: boolean;
   /** Raven channel index (1-based) the selections refer to. */
   channel?: number;
   annotation?: string;
 }
 
-const fmtTime = (t: number) => String(Number(t.toFixed(3)));
+const fmtNum = (t: number) => String(Number(t.toFixed(3)));
 
-export function toSelectionRows(items: readonly SelectionInput[], opts: TableOptions = {}): SelectionRow[] {
-  const { includeScore = true, channel = 1, annotation = "penguin" } = opts;
+export function toSelectionRows(items: readonly SelectionInput[], opts: TableOptions): SelectionRow[] {
+  const { sampleRate, includeScore = true, channel = 1, annotation = "penguin" } = opts;
+  const nyquist = sampleRate / 2;
   return [...items]
     .sort((a, b) => a.begin - b.begin)
     .map((d, i) => {
@@ -44,8 +53,10 @@ export function toSelectionRows(items: readonly SelectionInput[], opts: TableOpt
         Selection: String(i + 1),
         View: "Spectrogram 1",
         Channel: String(channel),
-        "Begin Time (s)": fmtTime(d.begin),
-        "End Time (s)": fmtTime(d.end),
+        "Begin Time (s)": fmtNum(d.begin),
+        "End Time (s)": fmtNum(d.end),
+        "Low Freq (Hz)": fmtNum(d.lowFreq ?? 0),
+        "High Freq (Hz)": fmtNum(d.highFreq ?? nyquist),
         Annotation: d.annotation ?? annotation,
         call_type: "",
         condition: "",
@@ -91,6 +102,8 @@ const numeric = (msg: string) =>
     .refine((s) => Number.isFinite(Number(s)), msg)
     .transform(Number);
 
+const bothFinite = (a: number, b: number) => Number.isFinite(a) && Number.isFinite(b);
+
 const rowSchema = z
   .object({
     Selection: numeric("must be a number").refine((n) => Number.isInteger(n) && n >= 1, "must be a positive integer"),
@@ -98,6 +111,8 @@ const rowSchema = z
     Channel: numeric("must be a number").refine((n) => Number.isInteger(n) && n >= 1, "must be a positive integer"),
     "Begin Time (s)": numeric("must be a number").refine((n) => n >= 0, "must be ≥ 0"),
     "End Time (s)": numeric("must be a number").refine((n) => n >= 0, "must be ≥ 0"),
+    "Low Freq (Hz)": numeric("must be a number").refine((n) => n >= 0, "must be ≥ 0"),
+    "High Freq (Hz)": numeric("must be a number").refine((n) => n >= 0, "must be ≥ 0"),
     Annotation: z.string(),
     count: z
       .string()
@@ -105,9 +120,14 @@ const rowSchema = z
       .refine((s) => s === "" || (Number.isInteger(Number(s)) && Number(s) >= 0), "must be empty or a non-negative integer"),
   })
   .loose()
-  .refine((r) => r["End Time (s)"] > r["Begin Time (s)"], {
+  // Cross-field checks only apply once both values are valid numbers (avoids duplicate messages).
+  .refine((r) => !bothFinite(r["Begin Time (s)"], r["End Time (s)"]) || r["End Time (s)"] > r["Begin Time (s)"], {
     message: "must be greater than Begin Time (s)",
     path: ["End Time (s)"],
+  })
+  .refine((r) => !bothFinite(r["Low Freq (Hz)"], r["High Freq (Hz)"]) || r["High Freq (Hz)"] > r["Low Freq (Hz)"], {
+    message: "must be greater than Low Freq (Hz)",
+    path: ["High Freq (Hz)"],
   });
 
 export function checkSelectionTable(text: string): CheckResult {

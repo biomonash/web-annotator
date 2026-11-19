@@ -11,8 +11,8 @@ export function TableChecker() {
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">Check a selection table</h2>
       <p className="text-sm text-zinc-500">
-        Validates Raven selection tables (TSV) against the expected columns: unique selection numbers, numeric times,
-        and End &gt; Begin.
+        Validates Raven selection tables (TSV) against the expected columns: unique selection numbers, numeric times and
+        frequencies, End &gt; Begin and High Freq &gt; Low Freq.
       </p>
       <input
         type="file"

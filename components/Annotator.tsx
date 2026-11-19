@@ -148,7 +148,8 @@ export function Annotator() {
     const table = formatSelectionTable(
       toSelectionRows(
         kept.map((r) => ({ begin: r.begin, end: r.end, score: r.maxScore })),
-        { includeScore },
+        // Low Freq defaults to 0 Hz and High Freq to the Nyquist frequency of the recording.
+        { includeScore, sampleRate: active?.info?.sampleRate ?? PERCH.sampleRate },
       ),
       delimiter,
     );
