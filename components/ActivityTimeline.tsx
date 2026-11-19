@@ -2,6 +2,7 @@
 
 import type { WindowScore } from "@/lib/pipeline/analyze";
 import { formatClock } from "@/lib/format";
+import { isHit } from "@/lib/pipeline/detect";
 
 export interface TimelineRange {
   id: string;
@@ -14,13 +15,15 @@ interface Props {
   totalSec: number;
   processedSec: number;
   threshold: number;
+  /** Penguin must be the top class (see `isHit`). */
+  topOnly: boolean;
   detections: readonly TimelineRange[];
   selectedId: string | null;
   onSeek(sec: number): void;
 }
 
 /** Per-window score bars across the whole recording, with detections and processing progress. */
-export function ActivityTimeline({ windows, totalSec, processedSec, threshold, detections, selectedId, onSeek }: Props) {
+export function ActivityTimeline({ windows, totalSec, processedSec, threshold, topOnly, detections, selectedId, onSeek }: Props) {
   const W = 1000;
   const H = 80;
   const x = (t: number) => (totalSec > 0 ? (t / totalSec) * W : 0);
@@ -62,7 +65,7 @@ export function ActivityTimeline({ windows, totalSec, processedSec, threshold, d
             y={H - w.score * H}
             width={Math.max(0.6, x(w.end) - x(w.begin) - 0.3)}
             height={w.score * H}
-            className={w.score >= threshold ? "fill-sky-600" : "fill-zinc-400 dark:fill-zinc-600"}
+            className={isHit(w, threshold, topOnly) ? "fill-sky-600" : "fill-zinc-400 dark:fill-zinc-600"}
           />
         ))}
         <line x1={0} x2={W} y1={H - threshold * H} y2={H - threshold * H} className="stroke-rose-500" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />

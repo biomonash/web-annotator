@@ -69,10 +69,15 @@ The workflow sets two build variables:
 ## How detection works
 
 1. The audio is decoded in chunks. Each channel gets the PoC's overflow fix, then channels are averaged to mono.
-2. Every 5 s window is resampled to 32 kHz and scored by Perch v2. The last partial window is zero-padded.
+2. Every complete 5 s window is resampled to 32 kHz and scored by Perch v2. A trailing partial window is dropped,
+   as in the Python script.
 3. Score = `sigmoid(logit)` for class 4878 (Little Penguin). This is a detector score, not a calibrated probability.
-4. Consecutive windows with score ≥ threshold become one detection. Changing the threshold regroups the windows
-   instantly, without re-running the model.
+4. A window counts as a call when Little Penguin is the model's **top class** (the Python script's `argmax == 4878`
+   rule) and its score is at or above the threshold (default 0). Both can be changed in the UI. Perch's logits are
+   multi-label, so a positive penguin logit alone is common even when another class clearly wins; without the
+   top-class rule most windows pass.
+5. Consecutive call windows become one detection. Changing the settings regroups the windows instantly, without
+   re-running the model.
 
 To play clips: WAV files are read directly from disk. FLAC can't be seeked reliably, so the worker writes decoded mono
 audio to the Origin Private File System as it processes, and clips are read back from there.

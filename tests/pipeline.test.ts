@@ -25,41 +25,42 @@ function fakeModel(positives: Set<number>): ScoreModel & { calls: number[] } {
 }
 
 describe("analyze", () => {
-  it("scores every window including a zero-padded partial last one", async () => {
+  it("scores complete windows only and drops a trailing partial one, like the Python PoC", async () => {
     const rate = 8000;
     const audio = sine(300, rate, 23); // 4 full windows + 3 s
     const stream = await openAudio(bytesSource(makeWav([audio], rate)));
-    const model = fakeModel(new Set([1, 2, 4]));
+    const model = fakeModel(new Set([1, 2]));
     const seen: WindowScore[] = [];
     const mono: number[] = [];
-    const res = await analyze(stream, model, { ...DEFAULT_SETTINGS, batchSize: 2 }, {
+    let total: number | null = null;
+    const res = await analyze(stream, model, { ...DEFAULT_SETTINGS, batchSize: 3 }, {
+      onStart: (_info, totalWindows) => (total = totalWindows),
       onWindow: (w) => seen.push(w),
       onMono: (m) => mono.push(m.length),
     });
 
+    expect(total).toBe(4);
     expect(res.durationSec).toBeCloseTo(23);
-    expect(res.windows.map((w) => w.index)).toEqual([0, 1, 2, 3, 4]);
+    expect(res.windows.map((w) => w.index)).toEqual([0, 1, 2, 3]);
     expect(seen).toEqual(res.windows);
-    expect(res.windows[4]).toMatchObject({ begin: 20, end: 23 });
-    expect(model.calls).toEqual([2, 2, 1]);
+    expect(res.windows[3]).toMatchObject({ begin: 15, end: 20 });
+    expect(model.calls).toEqual([3, 1]);
+    // the partial window's audio is still kept for clip playback
     expect(mono.reduce((a, b) => a + b, 0)).toBe(23 * rate);
 
-    const dets = findDetections(res.windows, 0.5, true);
-    expect(dets.map((d) => [d.begin, d.end])).toEqual([
-      [5, 15],
-      [20, 23],
-    ]);
+    const dets = findDetections(res.windows, 0, true);
+    expect(dets.map((d) => [d.begin, d.end])).toEqual([[5, 15]]);
   });
 });
 
 describe("findDetections", () => {
-  const w = (index: number, score: number): WindowScore => ({
+  const w = (index: number, score: number, isTop = true): WindowScore => ({
     index,
     begin: index * 5,
     end: index * 5 + 5,
     score,
-    logit: 0,
-    isTop: false,
+    logit: Math.log(score / (1 - score)),
+    isTop,
   });
 
   it("marks a run touching the last processed window as open until complete", () => {
@@ -73,5 +74,29 @@ describe("findDetections", () => {
     expect(findDetections(ws, 0.5, true)).toHaveLength(2);
     expect(findDetections(ws, 0.3, true)).toHaveLength(1);
     expect(findDetections(ws, 0.7, true)).toHaveLength(0);
+  });
+
+  it("requires penguin to be the top class by default", () => {
+    // high penguin score but another class wins → not a call (the false-positive flood)
+    const ws = [w(0, 0.95, false), w(1, 0.3, true), w(2, 0.99, false)];
+    expect(findDetections(ws, 0, true).map((d) => d.id)).toEqual(["w1"]);
+    expect(findDetections(ws, 0, true, false)).toHaveLength(1); // all hits merge into one run
+    expect(findDetections(ws, 0.5, true, false).map((d) => d.id)).toEqual(["w0", "w2"]);
+  });
+
+  it("matches the Python rule (argmax == penguin, merge consecutive) at threshold 0", () => {
+    const flags = [0, 1, 1, 0, 1, 0, 0, 1, 1, 1].map(Boolean);
+    const ws = flags.map((top, i) => w(i, 0.01 + 0.9 * Math.random(), top));
+    // Python: runs.append((run_start * 5, i * 5))
+    const python: [number, number][] = [];
+    let start: number | null = null;
+    [...flags, false].forEach((f, i) => {
+      if (f && start === null) start = i;
+      else if (!f && start !== null) {
+        python.push([start * 5, i * 5]);
+        start = null;
+      }
+    });
+    expect(findDetections(ws, 0, true).map((d) => [d.begin, d.end])).toEqual(python);
   });
 });

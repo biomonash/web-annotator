@@ -29,6 +29,7 @@ export function Annotator() {
   const [settings, setSettings] = useState<AnalysisSettings>(DEFAULT_SETTINGS);
   const [backend, setBackend] = useState<BackendPreference>("auto");
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
+  const [topOnly, setTopOnly] = useState(true);
   const [padSec, setPadSec] = useState(2);
   const [includeScore, setIncludeScore] = useState(true);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
@@ -56,7 +57,10 @@ export function Annotator() {
     (active?.info?.totalFrames != null ? active.info.totalFrames / active.info.sampleRate : windows.at(-1)?.end ?? 0);
   const processedSec = windows.at(-1)?.end ?? 0;
 
-  const detections = useMemo(() => findDetections(windows, threshold, complete), [windows, threshold, complete]);
+  const detections = useMemo(
+    () => findDetections(windows, threshold, complete, topOnly),
+    [windows, threshold, complete, topOnly],
+  );
   const rows: Row[] = useMemo(
     () =>
       detections.map((d) => {
@@ -140,8 +144,16 @@ export function Annotator() {
       backend: model.status === "ready" ? model.backend : null,
       settings: active.settings,
       threshold,
+      topOnly,
       recording: { name: active.file.name, size: active.file.size, ...active.info, durationSec: totalSec },
-      windows: active.windows.map((w) => ({ index: w.index, begin: w.begin, end: w.end, score: Number(w.score.toFixed(5)) })),
+      windows: active.windows.map((w) => ({
+        index: w.index,
+        begin: w.begin,
+        end: w.end,
+        score: Number(w.score.toFixed(5)),
+        logit: Number(w.logit.toFixed(4)),
+        isTop: w.isTop,
+      })),
     };
     download(`${stem}.provenance.json`, JSON.stringify(info, null, 2), "application/json");
   };
@@ -325,6 +337,7 @@ export function Annotator() {
             totalSec={totalSec}
             processedSec={processedSec}
             threshold={threshold}
+            topOnly={topOnly}
             detections={kept}
             selectedId={selectedId}
             onSeek={(t) => {
@@ -339,13 +352,17 @@ export function Annotator() {
               Score threshold
               <input
                 type="range"
-                min={0.05}
+                min={0}
                 max={0.95}
                 step={0.01}
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
               />
               <span className="w-10 font-mono tabular-nums">{threshold.toFixed(2)}</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={topOnly} onChange={(e) => setTopOnly(e.target.checked)} />
+              Penguin must be top class
             </label>
             <label className="flex items-center gap-2">
               Play padding
@@ -365,8 +382,10 @@ export function Annotator() {
             </span>
           </div>
           <p className="text-xs text-zinc-500">
-            Score is sigmoid(model logit) for the Little Penguin class. It is a detector score, not a calibrated
-            probability. Each window is {PERCH.windowSeconds} s, so boundaries are approximate.
+            A window counts as a call when its score is at or above the threshold and, if &quot;top class&quot; is ticked,
+            Little Penguin is the model&apos;s highest-scoring class (the Python script&apos;s rule; threshold 0 matches
+            it exactly). Score is sigmoid(model logit): a detector score, not a calibrated probability. Each window
+            is {PERCH.windowSeconds} s, so boundaries are approximate.
           </p>
 
           {notice && <p className="text-sm text-rose-600">{notice}</p>}

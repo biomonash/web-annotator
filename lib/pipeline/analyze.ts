@@ -47,7 +47,7 @@ export async function analyze(
   const { info } = stream;
   const rate = info.sampleRate;
   const windowFrames = Math.round(PERCH.windowSeconds * rate);
-  const totalWindows = info.totalFrames != null ? Math.ceil(info.totalFrames / windowFrames) : null;
+  const totalWindows = info.totalFrames != null ? Math.floor(info.totalFrames / windowFrames) : null;
   cb.onStart?.(info, totalWindows);
 
   const fixers = Array.from({ length: info.channels }, () => new OverflowFixer());
@@ -81,7 +81,6 @@ export async function analyze(
   };
 
   const emitWindow = async (frames: number) => {
-    if (frames < windowFrames) buf.fill(0, frames); // zero-pad the trailing partial window
     const x = resample(buf, PERCH.windowSamples);
     scaleInPlace(x, settings.inputScaling);
     batch.set(x, pending.length * PERCH.windowSamples);
@@ -112,7 +111,7 @@ export async function analyze(
       if (filled === windowFrames) await emitWindow(windowFrames);
     }
   }
-  if (filled > 0) await emitWindow(filled);
+  // A trailing partial window is dropped, as in the Python PoC (`len // window`).
   await flushBatch();
 
   return { info, durationSec: totalFrames / rate, windows };

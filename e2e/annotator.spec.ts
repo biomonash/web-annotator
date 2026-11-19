@@ -27,7 +27,9 @@ for (const [label, file] of [
     await expect(page.getByText(/Done in/)).toBeVisible({ timeout: 5 * 60_000 });
     await expect(page.getByText(/48000 Hz · 2 ch/)).toBeVisible();
 
-    // A threshold of 0.05 makes most windows count as detections so the table/export paths are exercised.
+    // Noise has no real calls: drop the top-class rule and use a low threshold so most windows count as
+    // detections and the table/playback/export paths are exercised.
+    await page.getByLabel("Penguin must be top class").uncheck();
     await page.locator('input[type="range"]').fill("0.05");
     const playButtons = page.getByRole("button", { name: "▶ Play" });
     await expect(playButtons.first()).toBeVisible();

@@ -14,10 +14,26 @@ export interface Detection {
 }
 
 /**
- * Groups consecutive windows with score ≥ threshold into detections.
- * `windows` must be in index order. Pure, so it can be re-run whenever the threshold changes.
+ * Whether a window counts as a penguin call.
+ * With `topOnly`, penguin must also be the highest-scoring class, which is the Python PoC's rule
+ * (`argmax == 4878`). Perch's logits are multi-label, so a positive penguin logit alone is common
+ * even when another class clearly wins.
  */
-export function findDetections(windows: readonly WindowScore[], threshold: number, complete: boolean): Detection[] {
+export function isHit(w: WindowScore, threshold: number, topOnly: boolean): boolean {
+  return w.score >= threshold && (!topOnly || w.isTop);
+}
+
+/**
+ * Groups consecutive hit windows (see `isHit`) into detections.
+ * `windows` must be in index order. Pure, so it can be re-run whenever the threshold changes.
+ * `topOnly = true` with `threshold = 0` reproduces the Python PoC exactly.
+ */
+export function findDetections(
+  windows: readonly WindowScore[],
+  threshold: number,
+  complete: boolean,
+  topOnly = true,
+): Detection[] {
   const out: Detection[] = [];
   let run: WindowScore[] = [];
 
@@ -40,7 +56,7 @@ export function findDetections(windows: readonly WindowScore[], threshold: numbe
   for (const w of windows) {
     const contiguous = run.length === 0 || w.index === run[run.length - 1].index + 1;
     if (!contiguous) close(false);
-    if (w.score >= threshold) run.push(w);
+    if (isHit(w, threshold, topOnly)) run.push(w);
     else close(false);
   }
   close(!complete);
