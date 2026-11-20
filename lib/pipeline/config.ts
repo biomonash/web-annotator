@@ -28,5 +28,9 @@ export const DEFAULT_SETTINGS: AnalysisSettings = {
   batchSize: 4,
 };
 
-/** Minimum sigmoid(penguin logit). 0 = no cutoff, which with "top class only" matches the Python PoC. */
-export const DEFAULT_THRESHOLD = 0;
+/**
+ * Minimum sigmoid(penguin logit) for a window to count as a call.
+ * 0 = no cutoff, which together with "top class only" matches the Python PoC.
+ * The default is high so that calls are not lost to the strict "top class" rule.
+ */
+export const DEFAULT_THRESHOLD = 0.95;

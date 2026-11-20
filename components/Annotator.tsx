@@ -39,7 +39,7 @@ export function Annotator() {
   const [settings, setSettings] = useState<AnalysisSettings>(DEFAULT_SETTINGS);
   const [backend, setBackend] = useState<BackendPreference>("auto");
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
-  const [topOnly, setTopOnly] = useState(true);
+  const [topOnly, setTopOnly] = useState(false);
   const [padSec, setPadSec] = useState(0);
   const [includeScore, setIncludeScore] = useState(true);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
@@ -449,7 +449,7 @@ export function Annotator() {
               <input
                 type="range"
                 min={0}
-                max={0.95}
+                max={0.99}
                 step={0.01}
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
@@ -485,14 +485,30 @@ export function Annotator() {
               {kept.length} detection{kept.length === 1 ? "" : "s"}
             </span>
           </div>
-          <p className="text-xs text-zinc-500">
-            A window counts as a call when its score is at or above the
-            threshold and, if &quot;top class&quot; is ticked, Little Penguin is
-            the model&apos;s highest-scoring class (the Python script&apos;s
-            rule; threshold 0 matches it exactly). Score is sigmoid(model
-            logit): a detector score, not a calibrated probability. Each window
-            is {PERCH.windowSeconds} s, so boundaries are approximate.
-          </p>
+          <ul className="list-disc space-y-1 pl-5 text-xs text-zinc-500">
+            <li>
+              <strong>Score threshold:</strong> how sure the detector must be
+              before a {PERCH.windowSeconds}-second stretch counts as a call.
+              Higher means fewer, more certain detections but more missed
+              calls; lower means more detections but more false alarms.
+            </li>
+            <li>
+              <strong>Penguin must be top class:</strong> also requires
+              penguin to be the detector&apos;s single best guess. This is
+              stricter and can miss calls when other sounds (other birds,
+              waves, wind) are loud. Off by default.
+            </li>
+            <li>
+              <strong>Play padding:</strong> extra seconds of audio played
+              before and after a detection for context. It does not change the
+              exported times.
+            </li>
+            <li>
+              The score is a detector score, not a probability, and each window
+              is {PERCH.windowSeconds} s long, so start and end times are
+              approximate.
+            </li>
+          </ul>
 
           {notice && <p className="text-sm text-rose-600">{notice}</p>}
 
