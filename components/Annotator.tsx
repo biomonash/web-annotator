@@ -12,6 +12,7 @@ import {
   type InputScaling,
 } from "@/lib/pipeline/config";
 import { findDetections } from "@/lib/pipeline/detect";
+import { DEFAULT_RULES } from "@/lib/pipeline/rules";
 import {
   formatSelectionTable,
   toSelectionRows,
@@ -176,6 +177,8 @@ export function Annotator() {
       settings: active.settings,
       threshold,
       topOnly,
+      // The annotation guideline the exported selection table follows.
+      selectionTableGuideline: DEFAULT_RULES.guideline,
       recording: {
         name: active.file.name,
         size: active.file.size,
