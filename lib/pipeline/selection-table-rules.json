@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "guideline": {
+    "name": "Penguin Call Annotation Guide (MVP Binary Classification Dataset)",
+    "version": "1.0.0",
+    "lastUpdated": "2026-11-20"
+  },
+  "file": {
+    "delimiter": "\t",
+    "extension": ".tsv",
+    "caseSensitive": true,
+    "extraColumns": "allow"
+  },
+  "defaultSeverity": "error",
+  "columns": [
+    {
+      "name": "Selection",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "integer",
+      "min": 1,
+      "unique": true,
+      "allowEmpty": false,
+      "description": "Raven selection number. Whole number, unique within the table."
+    },
+    {
+      "name": "View",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "text",
+      "pattern": "^Spectrogram [0-9]+$",
+      "severity": "warning",
+      "message": "should be a spectrogram view (e.g. \"Spectrogram 1\"); waveform views are no longer used",
+      "allowEmpty": false,
+      "exportDefault": "Spectrogram 1",
+      "description": "Raven view the selection was drawn in. Spectrogram only."
+    },
+    {
+      "name": "Channel",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "integer",
+      "min": 1,
+      "allowEmpty": false,
+      "description": "Raven channel number (1-based)."
+    },
+    {
+      "name": "Begin Time (s)",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "number",
+      "min": 0,
+      "allowEmpty": false,
+      "description": "Start of the selection, in seconds."
+    },
+    {
+      "name": "End Time (s)",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "number",
+      "min": 0,
+      "allowEmpty": false,
+      "description": "End of the selection, in seconds."
+    },
+    {
+      "name": "Low Freq (Hz)",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "number",
+      "min": 0,
+      "allowEmpty": false,
+      "description": "Lower frequency bound of the selection, in Hz."
+    },
+    {
+      "name": "High Freq (Hz)",
+      "group": "raven",
+      "headerRequired": true,
+      "type": "number",
+      "min": 0,
+      "allowEmpty": false,
+      "description": "Upper frequency bound of the selection, in Hz."
+    },
+    {
+      "name": "Annotation",
+      "group": "annotation",
+      "headerRequired": true,
+      "type": "enum",
+      "values": [
+        "penguin",
+        "wind",
+        "rain",
+        "ocean",
+        "still",
+        "vehicle",
+        "human",
+        "other_species",
+        "unknown"
+      ],
+      "allowEmpty": false,
+      "exportDefault": "penguin",
+      "description": "Primary sound category. \"still\" = quiet background with no wind/rain/ocean. Use \"unknown\" only when a sound clearly is not one of the others and cannot be placed. Never identify non-penguin species: use \"other_species\"."
+    },
+    {
+      "name": "call_type",
+      "group": "annotation",
+      "headerRequired": true,
+      "type": "enum",
+      "values": ["call", "song", "duet", "begging"],
+      "allowEmpty": true,
+      "description": "Penguin vocalisation type. Only used when Annotation = penguin."
+    },
+    {
+      "name": "condition",
+      "group": "annotation",
+      "headerRequired": true,
+      "type": "enumList",
+      "values": [
+        "wind",
+        "rain",
+        "still",
+        "ocean",
+        "other_species",
+        "human",
+        "unknown"
+      ],
+      "separator": "+",
+      "allowDuplicates": false,
+      "allowEmpty": true,
+      "description": "Background condition overlapping a penguin call. Only filled when Annotation = penguin and something else is happening at the same time. Combine several with \"+\" (e.g. other_species+wind)."
+    },
+    {
+      "name": "distance",
+      "group": "annotation",
+      "headerRequired": true,
+      "type": "enum",
+      "values": ["close", "middle", "far"],
+      "allowEmpty": true,
+      "description": "Estimated distance of the penguin call from the song meter. Only applies when Annotation = penguin."
+    },
+    {
+      "name": "count",
+      "group": "annotation",
+      "headerRequired": true,
+      "type": "text",
+      "pattern": "^([1-9][0-9]*|>[1-9][0-9]*)$",
+      "message": "must be a whole number (1, 2, 3...) or a range such as >1, >2, >3",
+      "allowEmpty": true,
+      "description": "Number of penguins calling. Exact number if certain; otherwise a range (>1, >2, >3...). Only applies when Annotation = penguin."
+    },
+    {
+      "name": "Score",
+      "group": "tool",
+      "headerRequired": false,
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "allowEmpty": true,
+      "description": "Optional detector score added by this tool. Not part of the annotation guideline."
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "end-after-begin",
+      "column": "End Time (s)",
+      "operator": ">",
+      "otherColumn": "Begin Time (s)"
+    },
+    {
+      "id": "high-freq-above-low-freq",
+      "column": "High Freq (Hz)",
+      "operator": ">",
+      "otherColumn": "Low Freq (Hz)"
+    }
+  ],
+  "conditionalRules": [
+    {
+      "id": "penguin-rows-need-details",
+      "when": { "column": "Annotation", "in": ["penguin"] },
+      "require": ["call_type", "distance", "count"],
+      "message": "is required when Annotation is penguin"
+    },
+    {
+      "id": "non-penguin-rows-leave-details-empty",
+      "when": { "column": "Annotation", "notIn": ["penguin"] },
+      "mustBeEmpty": ["call_type", "condition", "distance", "count"],
+      "message": "must be empty when Annotation is not penguin"
+    }
+  ]
+}
